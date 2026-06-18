@@ -11,5 +11,6 @@ export const env = {
     ALFABETA_ENDPOINT: process.env.ALFABETA_ENDPOINT || '',
     ALFABETA_USUARIO: process.env.ALFABETA_USUARIO || '',
     ALFABETA_CLAVE: process.env.ALFABETA_CLAVE || '',
+    ALFABETA_SECRET: process.env.ALFABETA_SECRET || '',
     VADEMECUM_API_KEY: process.env.VADEMECUM_API_KEY || '',
 };

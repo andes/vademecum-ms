@@ -9,7 +9,6 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/src/server.js",
-        "start:dev": "ts-node ./src/server.ts",
         "dev": "nodemon",
         "seed": "ts-node scripts/seed-vademecum.ts",
         "seed:test": "ts-node scripts/seed-test-vademecum.ts",
