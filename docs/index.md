@@ -44,7 +44,7 @@ Todas las rutas requieren header `X-Api-Key`.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/medications?q=` | Buscar medicamentos por nombre |
+| GET | `/api/medications?q=` | Buscar medicamentos por nombre o droga genérica (ej. "actron 600" o "ibuprofeno 600") |
 | GET | `/api/medications/:id` | Detalle por ID |
 | GET | `/api/medications?snomed=` | Buscar por SNOMED |
 | GET | `/api/drugs?q=` | Buscar drogas |

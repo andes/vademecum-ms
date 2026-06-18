@@ -1,6 +1,7 @@
 import { VademecumRepository } from '../../modules/vademecum/vademecum.repository';
 
 import { AlfabetaClient } from './alfabeta.client';
+import { AlfabetaMedication } from './alfabeta.types';
 
 export class AlfabetaSync {
     constructor(
@@ -8,12 +9,19 @@ export class AlfabetaSync {
         private readonly repository: VademecumRepository,
     ) {}
 
-    async syncFull(): Promise<{ medications: number; drugs: number; actions: number; ultimolog: number }> {
+    async syncFull(): Promise<{ medications: number; drugs: number; actions: number; ultimolog: number; skipped: boolean }> {
         // eslint-disable-next-line no-console
         console.log('[AlfabetaSync] Starting full sync...');
 
-        const [catalog, drugsResp, actionsResp] = await Promise.all([
-            this.client.fetchFullCatalog(),
+        const catalog = await this.client.fetchFullCatalog();
+
+        if (catalog.estado === 'SIN_NOVEDADES' || !catalog.datos || catalog.datos.length === 0) {
+            // eslint-disable-next-line no-console
+            console.log('[AlfabetaSync] Alfabeta respondió SIN_NOVEDADES: la base ya está cargada. Se omite la importación sin borrar los datos existentes.');
+            return { medications: 0, drugs: 0, actions: 0, ultimolog: 0, skipped: true };
+        }
+
+        const [drugsResp, actionsResp] = await Promise.all([
             this.client.fetchDrugs(),
             this.client.fetchActions(),
         ]);
@@ -68,7 +76,7 @@ export class AlfabetaSync {
 
         // eslint-disable-next-line no-console
         console.log('[AlfabetaSync] Full sync completed');
-        return { medications: savedMed, drugs: savedDrugs, actions: savedActions, ultimolog };
+        return { medications: savedMed, drugs: savedDrugs, actions: savedActions, ultimolog, skipped: false };
     }
 
     async syncUpdates(): Promise<{ processed: number; created: number; deleted: number; modified: number; priceChanges: number; restored: number }> {
@@ -90,6 +98,21 @@ export class AlfabetaSync {
         // eslint-disable-next-line no-console
         console.log(`[AlfabetaSync] Processing ${updates.length} updates...`);
 
+        const [drugsResp, actionsResp] = await Promise.all([
+            this.client.fetchDrugs(),
+            this.client.fetchActions(),
+        ]);
+        const drugDescById = new Map((drugsResp.datos || []).map(d => [d.id, d.descripcion]));
+        const actionDescById = new Map((actionsResp.datos || []).map(a => [a.id, a.descripcion]));
+
+        const enrich = (articulo: AlfabetaMedication): AlfabetaMedication & { droga_descrip: string; accion_descrip: string; [key: string]: unknown } => {
+            return {
+                ...articulo,
+                droga_descrip: drugDescById.get(articulo.droga) || '',
+                accion_descrip: actionDescById.get(articulo.accion) || '',
+            };
+        };
+
         let cantA = 0; let cantM = 0; let cantB = 0; let cantP = 0; let cantR = 0;
         let maxOrden = ultimolog;
 
@@ -99,13 +122,13 @@ export class AlfabetaSync {
             switch (upd.operacion) {
             case 'A':
                 if (upd.articulo) {
-                    await this.repository.saveMedication(upd.articulo as any);
+                    await this.repository.saveMedication(enrich(upd.articulo));
                     cantA++;
                 }
                 break;
             case 'M':
                 if (upd.articulo) {
-                    await this.repository.saveMedication(upd.articulo as any);
+                    await this.repository.saveMedication(enrich(upd.articulo));
                     cantM++;
                 }
                 break;

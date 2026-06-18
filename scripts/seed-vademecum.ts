@@ -26,6 +26,13 @@ const main = async (): Promise<void> => {
 
     const result = await sync.syncFull();
 
+    if (result.skipped) {
+        // eslint-disable-next-line no-console
+        console.log('=== Seed omitido: la base de Alfabeta ya está cargada (SIN_NOVEDADES). No se modificaron los datos existentes. ===');
+        await closeRedis();
+        return;
+    }
+
     // eslint-disable-next-line no-console
     console.log(`=== Seed completado: ${result.medications} medicamentos, ${result.drugs} drogas, ${result.actions} acciones, ultimolog=${result.ultimolog} ===`);
 
