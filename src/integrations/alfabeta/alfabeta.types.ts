@@ -33,13 +33,19 @@ export interface AlfabetaMedication {
 }
 
 export interface AlfabetaFullCatalogResponse {
+    estado: string;
     ultimolog: number;
+    ultimaFechaDetalleATC?: string;
+    novedades?: Array<Record<string, unknown>>;
     datos: AlfabetaMedication[];
 }
 
 export interface AlfabetaUpdate {
     operacion: 'A' | 'M' | 'B' | 'P' | 'R' | 'T' | 'C' | 'D';
     orden: number;
+    tabla?: string;
+    id?: number;
+    descripcion?: string;
     registro?: number;
     precio?: number;
     vigencia?: string;
@@ -47,6 +53,8 @@ export interface AlfabetaUpdate {
 }
 
 export interface AlfabetaUpdatesResponse {
+    estado: string;
+    novedades?: Array<Record<string, unknown>>;
     datos: AlfabetaUpdate[];
 }
 
@@ -56,6 +64,7 @@ export interface AlfabetaDrug {
 }
 
 export interface AlfabetaDrugsResponse {
+    estado: string;
     datos: AlfabetaDrug[];
 }
 
@@ -65,5 +74,6 @@ export interface AlfabetaAction {
 }
 
 export interface AlfabetaActionsResponse {
+    estado: string;
     datos: AlfabetaAction[];
 }

@@ -160,12 +160,20 @@ export class VademecumRepository {
 
     async saveDrug(drug: Drug): Promise<void> {
         const redis = getRedisClient();
-        await redis.hset(`${PREFIX_DROGA}${drug.id}`, { id: drug.id.toString(), descripcion: drug.descripcion });
+        const key = `${PREFIX_DROGA}${drug.id}`;
+        const pipeline = redis.pipeline();
+        pipeline.hset(key, 'id', drug.id.toString());
+        pipeline.hset(key, 'descripcion', drug.descripcion);
+        await pipeline.exec();
     }
 
     async saveAction(action: Action): Promise<void> {
         const redis = getRedisClient();
-        await redis.hset(`${PREFIX_ACCION}${action.id}`, { id: action.id.toString(), descripcion: action.descripcion });
+        const key = `${PREFIX_ACCION}${action.id}`;
+        const pipeline = redis.pipeline();
+        pipeline.hset(key, 'id', action.id.toString());
+        pipeline.hset(key, 'descripcion', action.descripcion);
+        await pipeline.exec();
     }
 
     async saveMedication(entry: { id: number; nombre: string; estado: string; presentacion: string; droga: number; accion: number; snomed: string; precio: number; [key: string]: unknown }): Promise<void> {
@@ -180,14 +188,17 @@ export class VademecumRepository {
                 hashData[k] = String(v);
             }
         }
-        await redis.hset(key, hashData);
+        if (Object.keys(hashData).length === 0) {return;}
 
-        const autocompleteMember = `${entry.nombre.toLowerCase()}|${entry.id}`;
-        await redis.zadd(KEY_AUTOCOMPLETE, 0, autocompleteMember);
-
-        if (entry.snomed) {
-            await redis.set(`vademecum:snomed:${entry.snomed}`, String(entry.id));
+        const pipeline = redis.pipeline();
+        for (const [field, value] of Object.entries(hashData)) {
+            pipeline.hset(key, field, value);
         }
+        pipeline.zadd(KEY_AUTOCOMPLETE, 0, `${entry.nombre.toLowerCase()}|${entry.id}`);
+        if (entry.snomed) {
+            pipeline.set(`vademecum:snomed:${entry.snomed}`, String(entry.id));
+        }
+        await pipeline.exec();
     }
 
     async saveMedications(entries: Array<{ id: number; nombre: string; estado: string; presentacion: string; droga: number; accion: number; snomed: string; precio: number; [key: string]: unknown }>): Promise<number> {
@@ -207,7 +218,11 @@ export class VademecumRepository {
                     hashData[k] = String(v);
                 }
             }
-            pipeline.hset(key, hashData);
+            if (Object.keys(hashData).length === 0) {continue;}
+
+            for (const [field, value] of Object.entries(hashData)) {
+                pipeline.hset(key, field, value);
+            }
             pipeline.zadd(KEY_AUTOCOMPLETE, 0, `${entry.nombre.toLowerCase()}|${entry.id}`);
             if (entry.snomed) {
                 pipeline.set(`vademecum:snomed:${entry.snomed}`, String(entry.id));
@@ -221,15 +236,23 @@ export class VademecumRepository {
 
     async updateMedicationPrice(id: number, precio: number, vigencia: string): Promise<void> {
         const redis = getRedisClient();
-        await redis.hset(`${PREFIX_MED}${id}`, { precio: String(precio), vigencia, fecha_act: new Date().toISOString() });
+        const key = `${PREFIX_MED}${id}`;
+        const pipeline = redis.pipeline();
+        pipeline.hset(key, 'precio', String(precio));
+        pipeline.hset(key, 'vigencia', vigencia);
+        pipeline.hset(key, 'fecha_act', new Date().toISOString());
+        await pipeline.exec();
     }
 
     async updateMedicationStatus(id: number, estado: string, precio?: number, vigencia?: string): Promise<void> {
         const redis = getRedisClient();
-        const data: Record<string, string> = { estado, fecha_act: new Date().toISOString() };
-        if (precio !== undefined) {data.precio = String(precio);}
-        if (vigencia !== undefined) {data.vigencia = vigencia;}
-        await redis.hset(`${PREFIX_MED}${id}`, data);
+        const key = `${PREFIX_MED}${id}`;
+        const pipeline = redis.pipeline();
+        pipeline.hset(key, 'estado', estado);
+        pipeline.hset(key, 'fecha_act', new Date().toISOString());
+        if (precio !== undefined) { pipeline.hset(key, 'precio', String(precio)); }
+        if (vigencia !== undefined) { pipeline.hset(key, 'vigencia', vigencia); }
+        await pipeline.exec();
     }
 
     async deleteMedication(id: number): Promise<void> {
@@ -253,7 +276,13 @@ export class VademecumRepository {
         for (const [k, v] of Object.entries(meta)) {
             if (v !== undefined && v !== null) {data[k] = String(v);}
         }
-        await redis.hset(KEY_META, data);
+        if (Object.keys(data).length === 0) {return;}
+
+        const pipeline = redis.pipeline();
+        for (const [field, value] of Object.entries(data)) {
+            pipeline.hset(KEY_META, field, value);
+        }
+        await pipeline.exec();
     }
 
     async clearAll(): Promise<void> {
