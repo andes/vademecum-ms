@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  # vademecum-ms — Microservicio de vademécum
+
+  ## Dominio
+  Consulta de medicamentos, drogas y acciones farmacéuticas. La fuente de
+  datos primaria es la API de Alfabeta y se cachea en Redis.
+
+  ## Stack
+  - Node.js 24.x, Express 4.x, TypeScript 5.x
+  - Redis (ioredis), API de Alfabeta (axios)
+  - Validación con Zod, lint con ESLint
+
+  ## Estructura
+  - src/server.ts — entry point: Express → initializeRedis → routes
+  - src/config/config.ts — variables de entorno tipadas con dotenv
+  - src/shared/ — api-response, errores (ApiError/NotFound/Validation/Internal),
+    middlewares (auth con X-Api-Key, error handler global), redis.service
+  - src/integrations/alfabeta/ — client HTTP, sync (full/incremental), types
+  - src/modules/vademecum/ — controller, service, repository (Redis), routes,
+    dto, types, errors
+  - src/routes/routes.ts — monta los módulos bajo /api
+
+  ## Convenciones
+  - 4 espacios, comillas simples, sin console.log (salvo `// eslint-disable-next-line no-console`)
+  - Errores custom heredan de ApiError en shared/errors/
+  - Controllers usan arrow functions y delegan errores con next(error)
+
+  ## Formato de respuesta
+  - Éxito: { "status": "success", "data": ... }
+  - Error: { "status": "error", "error": { "code", "message" } }
+
+  ## Variables de entorno
+  - PORT (default 4001), REDIS_HOST/PORT/PASSWORD/DB,
+    ALFABETA_ENDPOINT/USUARIO/CLAVE/SECRET, VADEMECUM_API_KEY
+
+  ## Scripts
+  - npm run dev | build | start | seed | seed:test | sync | lint | lint:fix
