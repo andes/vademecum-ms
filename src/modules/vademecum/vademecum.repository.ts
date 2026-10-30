@@ -7,29 +7,58 @@ const PREFIX_DROGA = 'vademecum:drogas:';
 const PREFIX_ACCION = 'vademecum:acciones:';
 const KEY_AUTOCOMPLETE = 'vademecum:autocomplete';
 const KEY_META = 'vademecum:meta';
+const normalize = (value: string): string => {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+};
 
-const parseMedId = (member: string): number | null => {
-    const pipeIdx = member.lastIndexOf('|');
-    if (pipeIdx === -1) {return null;}
-    return parseInt(member.slice(pipeIdx + 1), 10) || null;
+const buildSearchText = (entry: { nombre: string; [key: string]: unknown }): string => {
+    const parts = [entry.nombre, entry.droga_descrip, entry.potencia]
+        .filter(v => v !== undefined && v !== null && v !== '')
+        .map(v => String(v));
+    return normalize(parts.join(' '));
 };
 
 export class VademecumRepository {
 
-    async searchByName(term: string, limit = 20): Promise<VademecumEntry[]> {
+    async searchContaining(term: string, limit = 20): Promise<VademecumEntry[]> {
         const redis = getRedisClient();
-        const normalized = term.toLowerCase();
-        const min = `[${normalized}`;
-        const max = `[${normalized}\xff`;
+        const normalized = normalize(term);
+        if (!normalized) {return [];}
 
-        const members = await redis.zrangebylex(KEY_AUTOCOMPLETE, min, max, 'LIMIT', 0, limit);
-        if (members.length === 0) {return [];}
+        const ids: number[] = [];
+        let cursor = '0';
 
-        const ids = members
-            .map(parseMedId)
-            .filter((id): id is number => id !== null);
+        do {
+            const [next, keys] = await redis.scan(cursor, 'MATCH', `${PREFIX_MED}*`, 'COUNT', 1000);
+            cursor = next;
 
-        return this.getMedicationsByIds(ids);
+            if (keys.length > 0) {
+                const pipeline = redis.pipeline();
+                for (const key of keys) {
+                    pipeline.hget(key, 'search_text');
+                }
+                const results = await pipeline.exec();
+                if (results) {
+                    for (let i = 0; i < results.length; i++) {
+                        const [, searchText] = results[i] as [Error | null, string | null];
+                        if (searchText && searchText.includes(normalized)) {
+                            const id = parseInt(keys[i].slice(PREFIX_MED.length), 10);
+                            if (!Number.isNaN(id)) {ids.push(id);}
+                        }
+                    }
+                }
+            }
+        } while (cursor !== '0');
+
+        if (ids.length === 0) {return [];}
+
+        const entries = await this.getMedicationsByIds(ids);
+        entries.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        return entries.slice(0, limit);
     }
 
     async getMedicationById(id: number): Promise<VademecumEntry | null> {
@@ -190,6 +219,8 @@ export class VademecumRepository {
         }
         if (Object.keys(hashData).length === 0) {return;}
 
+        hashData.search_text = buildSearchText(entry);
+
         const pipeline = redis.pipeline();
         for (const [field, value] of Object.entries(hashData)) {
             pipeline.hset(key, field, value);
@@ -219,6 +250,8 @@ export class VademecumRepository {
                 }
             }
             if (Object.keys(hashData).length === 0) {continue;}
+
+            hashData.search_text = buildSearchText(entry);
 
             for (const [field, value] of Object.entries(hashData)) {
                 pipeline.hset(key, field, value);

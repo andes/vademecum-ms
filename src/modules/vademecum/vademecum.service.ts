@@ -15,7 +15,7 @@ export class VademecumService {
         }
 
         if (q) {
-            let results = await this.repository.searchByName(q, limit);
+            let results = await this.repository.searchContaining(q, limit);
 
             if (drug !== undefined) {
                 results = results.filter(r => r.droga === drug);

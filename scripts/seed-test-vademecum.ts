@@ -156,6 +156,7 @@ const main = async (): Promise<void> => {
 
     for (const [drugIdStr, names] of Object.entries(brandNames)) {
         const dId = Number(drugIdStr);
+        const drugDesc = drugs.find(d => d.id === dId)?.descripcion || '';
         for (const name of names) {
             const lab = labs[Math.floor(Math.random() * labs.length)];
             const precio = Math.round((Math.random() * 5000 + 100) * 100) / 100;
@@ -176,7 +177,8 @@ const main = async (): Promise<void> => {
                 via: vias[Math.floor(Math.random() * vias.length)],
                 vigencia: new Date().toISOString().slice(0, 10),
                 unidadPotencia: 1,
-                potencia: String(Math.round(Math.random() * 500 + 10)),
+                potencia: name.startsWith(drugDesc) ? name.slice(drugDesc.length).trim() : '',
+                droga_descrip: drugDesc,
                 unidadUnidades: 1,
                 unidades: Math.round(Math.random() * 100 + 10),
                 iva: '10.5',

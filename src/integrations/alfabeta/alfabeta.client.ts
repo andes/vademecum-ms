@@ -33,6 +33,32 @@ export class AlfabetaClient {
             headers: { usuario, clave },
             timeout: 120000,
         });
+
+        this.client.interceptors.request.use((config) => {
+            // eslint-disable-next-line no-console
+            console.log(`[Alfabeta] REQUEST ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.params ? `params=${JSON.stringify(config.params)}` : '');
+            return config;
+        });
+
+        this.client.interceptors.response.use(
+            (response) => {
+                const datos = (response.data as { datos?: unknown[] })?.datos;
+                // eslint-disable-next-line no-console
+                console.log(`[Alfabeta] RESPONSE ${response.status} ${response.config.url}`, datos ? `datos=${datos.length}` : `keys=${Object.keys(response.data || {}).join(',')}`);
+                return response;
+            },
+            (error) => {
+                // eslint-disable-next-line no-console
+                console.error('[Alfabeta] ERROR', {
+                    url: error?.config?.url,
+                    message: error?.message,
+                    status: error?.response?.status,
+                    statusText: error?.response?.statusText,
+                    data: error?.response?.data,
+                });
+                return Promise.reject(error);
+            },
+        );
     }
 
     private ensureConfigured(): void {
@@ -74,7 +100,10 @@ export class AlfabetaClient {
         const response = await this.request<AlfabetaFullCatalogResponse>('/ifarmacia/base-completa', {
             params: { test: false },
         });
-        this.ensureOk(response.estado, '/ifarmacia/base-completa');
+        const estado = response.estado;
+        if (estado && estado !== 'OK' && estado !== 'SIN_NOVEDADES') {
+            throw new InternalError(`Alfabeta respondió con estado "${estado}" en /ifarmacia/base-completa.`);
+        }
         return response;
     }
 
