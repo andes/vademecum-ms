@@ -16,7 +16,11 @@ const normalize = (value: string): string => {
 };
 
 const buildSearchText = (entry: { nombre: string; [key: string]: unknown }): string => {
-    const parts = [entry.nombre, entry.droga_descrip, entry.potencia]
+    const codes = [
+        ...(Array.isArray(entry.codigoDeBarras) ? entry.codigoDeBarras : []),
+        ...(Array.isArray(entry.atcs) ? entry.atcs : []),
+    ].map(v => String(v));
+    const parts = [entry.nombre, entry.droga_descrip, entry.potencia, ...codes]
         .filter(v => v !== undefined && v !== null && v !== '')
         .map(v => String(v));
     return normalize(parts.join(' '));
@@ -59,58 +63,6 @@ export class VademecumRepository {
         const entries = await this.getMedicationsByIds(ids);
         entries.sort((a, b) => a.nombre.localeCompare(b.nombre));
         return entries.slice(0, limit);
-    }
-
-    async getMedicationById(id: number): Promise<VademecumEntry | null> {
-        const redis = getRedisClient();
-        const data = await redis.hgetall(`${PREFIX_MED}${id}`);
-        if (!data || Object.keys(data).length === 0) {return null;}
-        return this.mapHashToEntry(id, data);
-    }
-
-    async getMedicationBySnomed(snomed: string): Promise<VademecumEntry | null> {
-        const redis = getRedisClient();
-        const idStr = await redis.get(`vademecum:snomed:${snomed}`);
-        if (!idStr) {return null;}
-        return this.getMedicationById(parseInt(idStr, 10));
-    }
-
-    async getDrugs(term?: string, limit = 20): Promise<Drug[]> {
-        const redis = getRedisClient();
-        const keys = await redis.keys(`${PREFIX_DROGA}*`);
-        const results: Drug[] = [];
-
-        for (const key of keys) {
-            const data = await redis.hgetall(key);
-            if (data && data.id) {
-                const drug: Drug = { id: parseInt(data.id, 10), descripcion: data.descripcion || '' };
-                if (!term || drug.descripcion.toLowerCase().includes(term.toLowerCase())) {
-                    results.push(drug);
-                }
-            }
-        }
-
-        results.sort((a, b) => a.descripcion.localeCompare(b.descripcion));
-        return results.slice(0, limit);
-    }
-
-    async getActions(term?: string, limit = 20): Promise<Action[]> {
-        const redis = getRedisClient();
-        const keys = await redis.keys(`${PREFIX_ACCION}*`);
-        const results: Action[] = [];
-
-        for (const key of keys) {
-            const data = await redis.hgetall(key);
-            if (data && data.id) {
-                const action: Action = { id: parseInt(data.id, 10), descripcion: data.descripcion || '' };
-                if (!term || action.descripcion.toLowerCase().includes(term.toLowerCase())) {
-                    results.push(action);
-                }
-            }
-        }
-
-        results.sort((a, b) => a.descripcion.localeCompare(b.descripcion));
-        return results.slice(0, limit);
     }
 
     async getStats(): Promise<VademecumStats> {
@@ -226,9 +178,6 @@ export class VademecumRepository {
             pipeline.hset(key, field, value);
         }
         pipeline.zadd(KEY_AUTOCOMPLETE, 0, `${entry.nombre.toLowerCase()}|${entry.id}`);
-        if (entry.snomed) {
-            pipeline.set(`vademecum:snomed:${entry.snomed}`, String(entry.id));
-        }
         await pipeline.exec();
     }
 
@@ -257,9 +206,6 @@ export class VademecumRepository {
                 pipeline.hset(key, field, value);
             }
             pipeline.zadd(KEY_AUTOCOMPLETE, 0, `${entry.nombre.toLowerCase()}|${entry.id}`);
-            if (entry.snomed) {
-                pipeline.set(`vademecum:snomed:${entry.snomed}`, String(entry.id));
-            }
             saved++;
         }
 
@@ -297,9 +243,6 @@ export class VademecumRepository {
         const pipeline = redis.pipeline();
         pipeline.del(key);
         pipeline.zrem(KEY_AUTOCOMPLETE, `${(data.nombre || '').toLowerCase()}|${id}`);
-        if (data.snomed) {
-            pipeline.del(`vademecum:snomed:${data.snomed}`);
-        }
         await pipeline.exec();
     }
 
@@ -329,18 +272,6 @@ export class VademecumRepository {
     async countMedications(): Promise<number> {
         const redis = getRedisClient();
         return redis.zcard(KEY_AUTOCOMPLETE);
-    }
-
-    async countDrugs(): Promise<number> {
-        const redis = getRedisClient();
-        const keys = await redis.keys(`${PREFIX_DROGA}*`);
-        return keys.length;
-    }
-
-    async countActions(): Promise<number> {
-        const redis = getRedisClient();
-        const keys = await redis.keys(`${PREFIX_ACCION}*`);
-        return keys.length;
     }
 
     private parseArray(value: string | undefined): string[] {

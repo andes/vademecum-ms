@@ -2,6 +2,18 @@
 
 Microservicio de vademécum con Redis + Alfabeta.
 
+## Especificación
+
+El comportamiento del sistema está documentado como especificaciones OpenSpec en [`openspec/specs/`](../openspec/specs/):
+
+| Capacidad | Ruta |
+|-----------|------|
+| Autenticación (`X-Api-Key`) | `authentication` |
+| Búsqueda de medicamentos | `medication-search` |
+| Sincronización con Alfabeta | `alfabeta-sync` |
+| Manejo de errores | `error-handling` |
+| Almacenamiento en Redis | `redis-storage` |
+
 ## Requisitos
 
 - Node.js 24.x (ver `.nvmrc`)
@@ -44,9 +56,4 @@ Todas las rutas requieren header `X-Api-Key`.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/medications?q=` | Buscar medicamentos por nombre o droga genérica (ej. "actron 600" o "ibuprofeno 600") |
-| GET | `/api/medications/:id` | Detalle por ID |
-| GET | `/api/medications?snomed=` | Buscar por SNOMED |
-| GET | `/api/drugs?q=` | Buscar drogas |
-| GET | `/api/actions?q=` | Buscar acciones |
-| GET | `/api/stats` | Estadísticas |
+| GET | `/api/medications?q=` | Buscar medicamentos por nombre, droga genérica, potencia, código de barras o código ATC (ej. "actron 600", "ibuprofeno 600") |
